@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html>
+<head> 
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="/static/index.css" />
+	<title>EMK Like</title>
+</head>
+<body>
+	<div class="panel">
+		Пользователь
+		<select id="user_from">
+			<option value="1414" selected>Гордеева</option>
+			<option value="1375">Матренин</option>
+			<option value="2375">Тимофеев</option>
+			<option value="2366">Газинский</option>
+			<option value="157">Друзина</option>
+			<option value="166">Ремизова</option>
+			<option value="372">Брагин</option>
+		</select>
+
+	</div>
+
+	<div class="profile", id="admin">
+	<h1>Админка</h1>
+		<div class = "panel" id = "activites">
+			Список всех активностей <br/>
+			<script>
+			function all_actions(){
+				const url='http://192.168.215.235:8000/activites';
+
+				fetch(url).then(response => response.text())
+    			.then(responseText => {
+					let actions = JSON.parse(responseText);
+					actions.forEach((act) => {
+
+						let ac = document.createElement("div");
+						ac.className = "alert";
+						ac.id = act["id"];
+						ac.innerHTML = act["name"] + "<br/>";
+						
+
+						let cst = document.createElement("div");
+						cst.className = "alert";
+						cst.innerHTML = `${act["coast"]} баллов`;
+
+						let usr = document.createElement("div");
+						usr.className = "alert";
+						usr.innerHTML = act["user_uuid"];
+
+						let red = document.createElement("div");
+						red.className = "alert";
+						red.innerHTML = "редактировать";
+						red.addEventListener("click", () => {
+
+							red.style.display = 'none';
+
+							let redact_active = document.getElementById("redaction");
+
+							let nm = document.createElement("input");
+							nm.value = act["name"];
+							
+							let ct = document.createElement("input");
+							ct.value = act["coast"];
+
+							let us = document.createElement("input");
+							us.value = act["user_uuid"];
+
+							let send = document.createElement("button");
+							send.innerHTML = "Изменить";
+
+							redact_active.append(nm);
+							redact_active.append(ct);
+							redact_active.append(us);
+							redact_active.append(send);
+
+							send.addEventListener("click", () => {
+								console.log(act["id"], nm.value, ct.value, us.value);
+
+								dt =  JSON.stringify({
+									id : act["id"],
+									name : nm.value,
+									coast : ct.value, 
+									user_uuid : us.value
+								});
+
+								let rsp = new XMLHttpRequest();
+								rsp.open("POST", "http://192.168.215.235:8000/change_activities");
+								rsp.setRequestHeader("Content-Type", "application/json");
+								rsp.send(dt);
+
+								redact_active.remove();
+								red.style.display = 'block';
+							});
+
+							let contenier = document.getElementById("activites");
+							contenier.append(redact_active);
+						});
+
+						let del = document.createElement("div");
+						del.className = "alert";
+						del.innerHTML = "удалить";
+						del.addEventListener("click", () => {
+							let dlt = document.getElementById("dlt");
+
+							let lbl = document.createElement("label");
+							lbl.className = "alert";
+							lbl.innerHTML = `Удалив «${act["name"]}», вы ограничите доступ к ней для «${act["user_uuid"]}»!`;
+
+							let btn = document.createElement("button");
+							btn.innerHTML="Удалить";
+							btn,addEventListener("click", () => {
+								let rsp = new XMLHttpRequest();
+								rsp.open("GET", `http://192.168.215.235:8000/delete_activities/${act["id"]}`);
+								rsp.send();
+
+								lbl.remove();
+								btn.remove();
+							});
+
+							dlt.append(lbl);
+							dlt.append(btn);
+						});
+
+						let entr = document.createElement("br");
+
+						ac.append(cst);
+						ac.append(usr);
+						ac.append(red);
+						ac.append(del);
+						ac.append(entr);
+
+
+						let contenier = document.getElementById("activites");
+						contenier.append(ac);
+					});
+				});
+			};
+			all_actions();
+			</script>
+		</div>
+		
+		<div class = "panel" id = "redaction">
+			Редактор активностей
+		</div>
+
+		<div class = "panel" id = "act_crt" >
+			Создать активность
+			<button id = "crt_btn" >Создать</button> <br/>
+			<script>
+				let act_crt = document.getElementById("act_crt");
+				crt_btn = document.getElementById("crt_btn");
+				crt_btn.addEventListener("click", () => {
+
+					let nm = document.createElement("input");
+					nm.value = "Название активности";
+							
+					let ct = document.createElement("input");
+					ct.value = "Сколько баллов датеся за активность";
+
+					let us = document.createElement("input");
+					us.value = "Ответственный пользователь";
+
+					let send = document.createElement("button");
+					send.innerHTML = "Продолжить";
+
+					act_crt.append(nm);
+					act_crt.append(ct);
+					act_crt.append(us);
+					act_crt.append(send);
+
+					send.addEventListener("click", () => {
+						
+						dt =  JSON.stringify({
+							name : nm.value,
+							coast : ct.value, 
+							user_uuid : us.value
+						});
+					
+						let rsp = new XMLHttpRequest();
+						rsp.open("POST", "http://192.168.215.235:8000/new_activities");
+						rsp.setRequestHeader("Content-Type", "application/json");
+						rsp.send(dt);
+
+						nm.remove();
+						ct.remove();
+						us.remove();
+						send.remove();
+					});
+				});
+			</script>
+		</div>
+
+		<!--div class = "panel", id = "dlt">
+			Удалить активность <br/>
+		</div-->
+	</div>
+
+
+	
+	<div class="profile" id="moder">
+		<h1>Модерка</h1>
+			<div class = "panel" id="slct_act">
+				Выбор активности <br/>
+
+				<script>
+				function slc_mdr(){
+					let slct = document.getElementById("user_from");
+					let uuid = slct.value;
+					let URL =`http://192.168.215.235:8000/actions/${uuid}`;
+
+					fetch(URL).then(response => response.text())
+					.then(responseText => {
+						let actions = JSON.parse(responseText);
+						let slct = document.createElement("select");
+						slct.id = "mdr_slct";
+						actions.forEach((act) => {
+							let opt = document.createElement("option");
+							opt.text = act["name"];
+							opt.value = act["id"];
+
+							slct.append(opt);
+						});
+
+						slct.addEventListener("click", () => {hst_mdr(); valid()});
+
+						let hst = document.getElementById("slct_act");
+						hst.append(slct);
+					});
+				};
+				slc_mdr()
+				</script>
+			</div>
+			
+			<div class = "panel" id = "actual">
+				Список неподтвержённых (подтвердить) <br/>
+				<script>
+				function valid() {
+					console.log('dsadsa');
+					let slt = document.getElementById("mdr_slct");
+					let name = slt.options[slt.selectedIndex].text;
+					let URL =`http://192.168.215.235:8000/confirmation/${name}`;
+
+					fetch(URL).then(response => response.text())
+					.then(responseText => {
+						let actions = JSON.parse(responseText);
+						actions.forEach((act) => {
+							let actual = document.getElementById("actual");
+
+							let ac = document.createElement("div");
+							ac.className = "alert";
+							ac.id = `activ${act["id"]}`;
+							ac.innerHTML = act["description"];
+
+							let from = document.createElement("div");
+							from.className = "alert";
+							from.innerHTML = `От: ${act["uuid_from"]}`;
+
+							let to = document.createElement("div");
+							to.className = "alert";
+							to.innerHTML = `Кому: ${act["uuid_from"]}`;
+
+							let when = document.createElement("div");
+							when.className = "alert";
+							when.innerHTML = `Когда: ${act["date_time"]}`;
+
+							let vld = document.createElement("div");
+							vld.className = "alert_true";
+							vld.innerText = "Подтвердить";
+
+							vld.addEventListener("click", () => {
+								let slct = document.getElementById("user_from");
+								let uuid = slct.value;
+								//запрос на валидность act["id"] от пользователя c uuid
+								let URL =`http://192.168.215.235:8000/do_valid/${act["id"]}/${uuid}`;
+								fetch(URL);
+							});
+
+							let anvld = document.createElement("div");
+							anvld.className = "alert_false";
+							anvld.innerText = "Отказать";
+
+							anvld.addEventListener("click", () => {
+								let slct = document.getElementById("user_from");
+								let uuid = slct.value;
+								//запрос на валидность act["id"] от пользователя c uuid
+								let URL =`http://192.168.215.235:8000/do_not_valid/${act["id"]}/${uuid}`;
+								fetch(URL);
+							});
+							
+							ac.append(from);
+							ac.append(to);
+							ac.append(when);
+							ac.append(vld);
+							ac.append(anvld);
+
+							actual.append(ac);
+							
+						});
+					});
+				};
+				</script>
+			</div>
+	
+			<div class = "panel" id = "blag">
+				Назначить багодарность <br/>
+
+				Кому: 
+
+				<select id="uuid_to">
+					<option value="1414" selected>Гордеева</option>
+					<option value="1375">Матренин</option>
+					<option value="2375">Тимофеев</option>
+					<option value="2366">Газинский</option>
+					<option value="157">Друзина</option>
+					<option value="166">Ремизова</option>
+					<option value="372">Брагин</option>
+				</select>
+				<br/>
+				<input class = "descr" id = "descr"></input>
+				</br>
+				<button class = "alert" id = "go" onclick="new_act()"> Назначить </button>
+
+				<script>
+				function new_act(){
+					let slct = document.getElementById("user_from");
+					uuid = slct.value;
+
+					let id_to = document.getElementById("uuid_to");
+					uuid_t = id_to.value;
+					 
+					let actions = document.getElementById("mdr_slct");
+					act_nm = actions.value;
+					
+					let ds = document.getElementById("descr");
+					descr = ds.value;
+
+					dt =  JSON.stringify({
+									uuid_from : uuid,
+									uuid_to : uuid_t,
+									act_id : act_nm,
+									description : descr
+								});
+
+					let rsp = new XMLHttpRequest();
+					rsp.open("POST", "http://192.168.215.235:8000/new_active");
+					rsp.setRequestHeader("Content-Type", "application/json");
+					rsp.send(dt);
+				}
+				</script>
+			</div>
+
+			<div class = "panel", id = "history_mdr">
+				История активности <br/>
+				<script>
+				function hst_mdr(){
+					let slt = document.getElementById("mdr_slct");
+					let action_name = slt.options[slt.selectedIndex].text;
+
+					let URL =`http://192.168.215.235:8000/history_mdr/${action_name}`;
+
+					fetch(URL).then(response => response.text())
+					.then(responseText => {
+						let actions = JSON.parse(responseText);
+						actions.forEach((act) => {
+							let history_mdr = document.getElementById("history_mdr");
+
+							let ac = document.createElement("div");
+							ac.className = "alert";
+							ac.id = `activ${act["id"]}`;
+							ac.innerHTML = act["description"];
+
+							let from = document.createElement("div");
+							from.className = "alert";
+							from.innerHTML = `От: ${act["uuid_from"]}`;
+
+							let to = document.createElement("div");
+							to.className = "alert";
+							to.innerHTML = `Кому: ${act["uuid_from"]}`;
+
+							let stat = document.createElement("div");
+							st = act["stat"];
+							if (st == "Просмотрено"){
+								stat.className = "alert_true";
+							}
+							else{
+								stat.className = "alert_false";
+							};
+							stat.className = "alert";
+							stat.innerHTML = `Статус: ${st}`;
+
+							let when = document.createElement("div");
+							when.className = "alert";
+							when.innerHTML = `Когда: ${act["date_time"]}`;
+
+							ac.append(from);
+							ac.append(to);
+							ac.append(stat);
+							ac.append(when);
+
+							history_mdr.append(ac);
+						});
+					});
+				}
+				</script>
+			</div>
+	</div>
+
+
+
+	<div class="profile", id="user">
+		<h1>Юзер</h1>
+			<div class = "panel" id = "summ">
+				Мои баллы
+				<script>
+				function m_sum(){
+
+					let slct = document.getElementById("user_from");
+					let uuid = slct.value;
+					let URL =`http://192.168.215.235:8000/summ/${uuid}`;
+
+					fetch(URL).then(response => response.text())
+					.then(responseText => {
+						let jsn = JSON.parse(responseText);
+						
+							let summ = document.getElementById("summ");
+							let my_summ = document.createElement("div");
+
+							my_summ.className = "alert";
+							my_summ.innerText = `${jsn}`;
+
+							summ.append(my_summ);
+						
+					});
+				}
+				</script>
+			</div>
+			
+			<div class = "panel">
+				Статистика баллов
+			</div>
+
+			<div class = "panel" id = "thank">
+				Поблагодарить сотрудника
+
+				<select id="thank_uuid_to">
+					<option value="1414" selected>Гордеева</option>
+					<option value="1375">Матренин</option>
+					<option value="2375">Тимофеев</option>
+					<option value="2366">Газинский</option>
+					<option value="157">Друзина</option>
+					<option value="166">Ремизова</option>
+					<option value="372">Брагин</option>
+				</select>
+				<br/>
+				<input class = "descr" id = "descr_thank"></input>
+				</br>
+				<button class = "alert" id = "go_thank" onclick="thank_to()"> Назначить </button>
+
+				<script>
+					function thank_to(){
+
+						let slct = document.getElementById("user_from");
+						let uuid = slct.value;
+
+						let id_to = document.getElementById("thank_uuid_to");
+						uuid_t = id_to.value;
+					
+						let ds = document.getElementById("descr_thank");
+						descr = ds.value;
+
+						dt =  JSON.stringify({
+									uuid_from : uuid,
+									uuid_to : uuid_t,
+									act_id : 0,
+									description : descr
+								});
+
+						let rsp = new XMLHttpRequest();
+						rsp.open("POST", "http://192.168.215.235:8000/new_active");
+						rsp.setRequestHeader("Content-Type", "application/json");
+						rsp.send(dt);
+					};
+				</script>
+			</div>
+
+			<div class = "panel" id="top">
+				Топ 20 + место в топе
+				<script>
+					function get_top(){
+						let all_top  = document.getElementById("top");
+
+						url = "http://192.168.215.235:8000/top";
+						fetch(url).then(response => response.text())
+						.then(responseText => {
+							let jsn = JSON.parse(responseText);
+							
+							let usr = document.createElement("div");
+							usr.className = "alert";
+
+							
+
+							jsn.forEach((act) => {
+								let plc = document.createElement("p");
+								plc.className = "alert";
+								plc.innerText = act["place"];
+
+								let us_id = document.createElement("p");
+								us_id.className = "alert";
+								us_id.innerText = act["uuid"];
+
+								let sum = document.createElement("p");
+								sum.className = "alert";
+								sum.innerText = act["sum"];
+
+								let entr = document.createElement("br");
+
+								usr.append(plc);
+								usr.append(us_id);
+								usr.append(sum);
+								usr.append(entr);
+
+								all_top.append(usr);
+							});
+
+							
+							
+						});
+
+						let my_top = document.createElement("div");
+						my_top.className = "alert";
+
+						let slct = document.getElementById("user_from");
+						let uuid = slct.value;
+
+						url = `http://192.168.215.235:8000/my_place/${uuid}`;
+						fetch(url).then(response => response.text())
+						.then(responseText => {
+							let plc = JSON.parse(responseText);
+							my_top.innerText = `Ваш рейтинг: ${plc}`;
+
+							all_top.append(my_top);
+						});
+
+					};
+				</script>
+			</div>
+	</div>
+
+	<script>
+		//авторизация
+		let slect = document.getElementById("user_from");
+		function list_roles(){
+			
+			let user_from = slect.value;
+			console.log("from uuid: ", user_from);
+
+			//функции админа
+			let admin_panel = document.getElementById("admin");
+			if (user_from != '1414'){
+				admin_panel.style.display = "none";
+			}
+			else{
+				admin_panel.style.display = "block";
+			};
+
+			//функции модератора
+			let moder_panel = document.getElementById("moder");
+			let moders = ['1414', '166', '372'];
+			if (moders.includes(user_from) ){
+				moder_panel.style.display = "block";
+			}
+			else{
+				moder_panel.style.display = "none";
+			};
+		};
+
+		list_roles();
+
+		thank_to();
+		m_sum();
+		get_top();
+		slect.addEventListener("change", () => {
+			list_roles();
+
+			thank_to();
+			m_sum();
+			get_top();
+		});
+	</script>
+
+
+
+	<!--
+
+
+	<div id = "new_active">
+		
+
+		
+		<h1> 1. Создание активности </h1> </br>
+
+		Кто ставит: 
+
+		<select id="uuid_from">
+			<option value="timofeev_uuid">Тимофеев</option>
+			<option value="gazinskiy_uuid">Газинский</option>
+			<option value="gordeeva_uuid" selected>Гордеева</option>
+		</select>
+		
+		Кому ставит:
+
+		<select id="uuid_to">
+			<option value="timofeev_uuid">Тимофеев</option>
+			<option value="gazinskiy_uuid" selected>Газинский</option>
+			<option value="gordeeva_uuid" >Гордеева</option>
+		</select>
+
+		<script>
+			//если у юзера uuid_from есть функции => вывести селект с ними
+
+			let category_id = 0; //Благодарность за экспертизу == 0
+			let coast = 3;
+			
+			//собрать JSON
+
+			//функция отправки JSON по нажатию send_active
+		</script>
+
+		</br>
+		<input id="description" />
+
+		<button id="send_active"> Отправить </button>
+
+	</br>
+	</div>
+
+	<div id="get_valid">
+		<h1> 2. Подтверждение активности </h1> </br>
+
+		
+		<script>
+			//вывести все активности ( activity.id | дата | кто | кому | категория | описание ), которын not valid
+
+			//выбор и сборка данных для отправки activity.id по наажтию do_valid
+
+		</script>
+
+		<button id="do_valid"> Подтвердить </button>
+
+	</br>
+	</div>
+
+	<div id="new_active">
+		<h1> 3. Создание новой активности </h1> </br>
+
+		Название активности <input id="description" /> </br>
+
+		Слоимость активности <input id="description" /> </br>
+
+		Кому дать права
+		<select id="uuid">
+			<option value="timofeev_uuid">Тимофеев</option>
+			<option value="gazinskiy_uuid">Газинский</option>
+			<option value="gordeeva_uuid" selected>Гордеева</option>
+		</select>
+
+		<script>
+			//Добавить активность в таблицу
+
+		</script>
+
+		<button id="go_active"> Создать </button>
+
+	</br>
+	</div>
+
+	<div id="my_active">
+		<h1> 4. Отображение активности </h1> </br>
+
+		Чья активность?
+		<select id="uuid">
+			<option value="timofeev_uuid">Тимофеев</option>
+			<option value="gazinskiy_uuid">Газинский</option>
+			<option value="gordeeva_uuid" selected>Гордеева</option>
+		</select>
+
+
+		<script>
+			// три запроса:
+			// 1) быллы по uuid с учетом valid
+			// 2) баллы по категориям
+			//выбрать категорию
+			// 3) история баллов оп категориям
+
+		</script>
+
+		<button id="check_active"> Посмотреть </button>
+
+	</br>
+	</div>
+	-->
+
+</body>
+</html>
