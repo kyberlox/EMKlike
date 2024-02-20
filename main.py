@@ -5,7 +5,7 @@ from starlette.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 import psycopg2
-conn = psycopg2.connect(dbname="emk", host="127.0.01", user="emk_u", password="cdjkjxm", port="5432")
+conn = psycopg2.connect(dbname="emk", host="127.0.0.1", user="emk_u", password="cdjkjxm", port="5432")
 
 import json
 import datetime
@@ -279,6 +279,7 @@ def statistics(uuid):
     activity = cursor.fetchall()
     Act = []
     for act in activity:
+        print(act)
         ac = {
             "id" : act[0],
             "name" : act[1],
@@ -291,7 +292,7 @@ def statistics(uuid):
 def statistics_history(action_id, uuid):
 
     command = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1) AND activites.id = {action_id});"
-
+    
     cursor = conn.cursor()
 
     cursor.execute(command)
@@ -310,7 +311,77 @@ def statistics_history(action_id, uuid):
         }
         Act.append(ac)
     return Act
+
+@app.get("/new_a_week/{uuid}")
+def  new_a_month(uuid):
+    command_1 = f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (SELECT date_trunc('week', NOW())) = (SELECT date_trunc('week', activeusers.date_time)) AND (activeusers.valid = 1 OR activeusers.valid = 2));"
+    command_2 = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (SELECT date_trunc('week', NOW())) = (SELECT date_trunc('week', activeusers.date_time)) AND (activeusers.valid = 1 OR activeusers.valid = 2));"
+
+    cursor = conn.cursor()
+
+    cursor.execute(command_1)
+    answer = cursor.fetchone()
+
+    sum=0
+    for ball in answer:
+        sum =  ball
     
+    cursor.execute(command_2)
+    ans = cursor.fetchall()
+
+    Act=[]
+    for act in ans:
+        ac = {
+            "id_activeusers" : act[0],
+            "uuid" : act[1],
+            "discr" : act[2],
+            "dt_time" : act[3],
+            "category" : act[4],
+            "coast" : act[5],
+            "id_activites" : act[6]
+        }
+        Act.append(ac)
+    
+    return {"summ" : sum, "activs" : Act}
+
+@app.get("/new_activs/{uuid}")
+def new_active(uuid):
+    command_1 = f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 1);"
+    command_2 = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 1);"
+    command_3 = f"UPDATE  activeusers SET valid = 2 WHERE valid = 1 AND activeusers.uuid_to = \'{uuid}\';"
+    cursor = conn.cursor()
+
+    cursor.execute(command_1)
+    answer = cursor.fetchone()
+
+    sum=0
+    for ball in answer:
+        sum =  ball
+    
+    cursor.execute(command_2)
+    ans = cursor.fetchall()
+
+    Act=[]
+    for act in ans:
+        ac = {
+            "id_activeusers" : act[0],
+            "uuid" : act[1],
+            "discr" : act[2],
+            "dt_time" : act[3],
+            "category" : act[4],
+            "coast" : act[5],
+            "id_activites" : act[6]
+        }
+        Act.append(ac)
+    
+
+    cursor.execute(command_3)
+    conn.commit()
+    
+    return {"summ" : sum, "activs" : Act}
+
+
+
 
 
 
