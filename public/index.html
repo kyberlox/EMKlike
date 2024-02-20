@@ -409,6 +409,86 @@
 
 	<div class="profile", id="user">
 		<h1>Юзер</h1>
+
+		<div class = "panel" id="new_activs">
+		Новые балллы: </br>
+			<script>
+				function new_activs(){
+
+					let slct = document.getElementById("user_from");
+					let uuid = slct.value;
+					let URL =`http://192.168.215.235:8000/new_activs/${uuid}`;
+
+					fetch(URL).then(response => response.text())
+					.then(responseText => {
+						let jsn = JSON.parse(responseText);
+						
+						let sm = document.createElement("div");
+						sm.className = "alert";
+						sm.innerText = jsn["summ"];
+
+						sm.addEventListener("click", () => {
+							jsn["activs"].forEach((st_hst) => {
+								let hist = document.createElement("div");
+								hist.className = "alert";
+								hist.innerHTML = `От кого: ${st_hst["uuid"]}; </br>
+												За что: ${st_hst["category"]}; </br>
+												Описание: ${st_hst["discr"]}; </br>
+												Баллы: ${st_hst["coast"]}; </br>
+												Когда: ${st_hst["dt_time"]}; </br>`;
+
+								sm.append(hist);
+								});
+						});
+
+						let nw = document.getElementById("new_week_ball");
+						nw.append(sm);
+					});
+				};
+			</script>
+		</div>
+
+		<div class = "panel" id ="new_week_ball">
+			Новые баллы за неделю: </br>
+			<script>
+				function new_week(){
+
+					let slct = document.getElementById("user_from");
+					let uuid = slct.value;
+					let URL =`http://192.168.215.235:8000/new_a_week/${uuid}`;
+
+					fetch(URL).then(response => response.text())
+					.then(responseText => {
+						let jsn = JSON.parse(responseText);
+						
+						let sm = document.createElement("div");
+						sm.className = "alert";
+						sm.innerText = jsn["summ"];
+
+						sm.addEventListener("click", () => {
+							jsn["activs"].forEach((st_hst) => {
+								let hist = document.createElement("div");
+								hist.className = "alert";
+								hist.innerHTML = `От кого: ${st_hst["uuid"]}; </br>
+												За что: ${st_hst["category"]}; </br>
+												Описание: ${st_hst["discr"]}; </br>
+												Баллы: ${st_hst["coast"]}; </br>
+												Когда: ${st_hst["dt_time"]}; </br>`;
+
+												//st_hst["id_activeusers"];
+												//st_hst["id_activites"];
+
+								sm.append(hist);
+								});
+						});
+
+						let nw = document.getElementById("new_week_ball");
+						nw.append(sm);
+					});
+				};
+			</script>
+		</div>
+
 			<div class = "panel" id = "summ">
 				Мои баллы
 				<script>
@@ -431,12 +511,83 @@
 							summ.append(my_summ);
 						
 					});
-				}
+				};
 				</script>
 			</div>
 			
-			<div class = "panel">
+			<div class = "panel" id = "stat">
 				Статистика баллов
+				<script>
+					function my_stat(){
+						let slct = document.getElementById("user_from");
+						let uuid = slct.value;
+						let URL =`http://192.168.215.235:8000/statistics/${uuid}`;
+
+						fetch(URL).then(response => response.text())
+						.then(responseText => {
+								let jsn = JSON.parse(responseText);
+							
+								let stats = document.getElementById("stat");
+
+								let stat = document.createElement("div");
+								stat.className = "alert";
+								
+								jsn.forEach((st) => {
+									let st_nm = document.createElement("div");
+									let st_vle = document.createElement("div");
+
+									st_nm.className = "alert";
+									st_vle.className = "alert";
+
+									st_nm.innerText = st["name"];
+									st_vle.innerText = st["stat"];
+
+									stat.append(st_nm);
+									stat.append(st_vle);
+
+									let act_id = st["id"];
+									console.log(act_id);
+
+									stat.addEventListener("click", () => {
+
+										let URL =`http://192.168.215.235:8000/statistics_history/${act_id}/${uuid}`;
+										fetch(URL).then(response => response.text())
+										.then(responseText => {
+											let jsn = JSON.parse(responseText);
+
+											jsn.forEach((st_hst) => {
+
+												let hist = document.createElement("div");
+												hist.className = "alert";
+												hist.innerHTML = `От кого: ${st_hst["uuid"]}; </br>
+												За что: ${st_hst["category"]}; </br>
+												Описание: ${st_hst["discr"]}; </br>
+												Баллы: ${st_hst["coast"]}; </br>
+												Когда: ${st_hst["dt_time"]}; </br>`;
+
+												//st_hst["id_activeusers"];
+												//st_hst["id_activites"];
+
+												stat.append(hist);
+											});
+										});
+									});
+
+								});
+
+								
+
+								
+
+
+								stats.append(stat);
+
+								let entr = document.createElement("br");
+								stats.append(stat);
+							
+						});
+						};
+				</script>
 			</div>
 
 			<div class = "panel" id = "thank">
@@ -574,14 +725,19 @@
 			};
 		};
 
+		new_activs();
+		new_week();
 		list_roles();
-
+		my_stat()
 		thank_to();
 		m_sum();
 		get_top();
-		slect.addEventListener("change", () => {
-			list_roles();
 
+		slect.addEventListener("change", () => {
+			new_activs();
+			new_week()
+			list_roles();
+			my_stat()
 			thank_to();
 			m_sum();
 			get_top();
