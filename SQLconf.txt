@@ -1,0 +1,47 @@
+CREATE TABLE Activites
+(
+	Id SERIAL PRIMARY KEY,
+	name VARCHAR(100),
+	coast INTEGER,
+	user_uuid VARCHAR(100)
+);
+
+CREATE TABLE ActiveUsers
+(
+	Id SERIAL PRIMARY KEY,
+	uuid_from VARCHAR(100),
+	uuid_to VARCHAR(100),
+	description VARCHAR(1000),
+	valid INTEGER DEFAULT 0 CHECK (valid >= 0 AND valid <= 3),
+	date_time timestamp DEFAULT NOW(),
+	ActivitesId INTEGER REFERENCES Activites (Id) ON DELETE CASCADE
+);
+
+CREATE TABLE NewActive
+(
+	ID SERIAL PRIMARY KEY,
+	user_uuid VARCHAR(100),
+	summ INTEGER NOT NULL,
+	ActiveUsersId INTEGER REFERENCES ActiveUsers (Id) ON UPDATE CASCADE DEFAULT 0
+);
+
+
+
+INSERT INTO Activites (Id, name, coast, user_uuid) 
+VALUES 
+(0, 'Благодарность за экспертизу коллеге', 3, '*'),
+(1, 'Внешние мероприятия (выездные семинары, выставки)', 3, '1414'),
+(2, 'Внутренние мероприятия (корпоративные поздравления и фильмы, турниры)', 2, '?'),
+(3, 'Пройдено обучение (ispring)', 3, '166'),
+(4, 'Пройдено обучение (тренинги, форумы, курсы, повышение квалификации)', 7, '166'),
+(5, 'Предложение по улучшению компании через сервис «Есть идея!»', 3, '372'),
+(6, 'Реализованная идея', 5, '372'),
+(7, 'Предложено новостей', 3, '1414'),
+(8, 'Сотрудник года (по спискам за все года ведения конкурса)', 50, '1414'),
+(9, 'Почетная грамота', 30, '1414'),
+(10, 'Статьи в «Блоги»', 10, '1414'),
+(11, 'Синертимы (участие, интеграторы, имплементоры)', 3, '?'),
+(12, 'Особые награды ', 15, '1414'),
+(13, 'Пригласил в компанию друга', 10, '?')
+
+SELECT * FROM Activites;
