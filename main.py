@@ -15,10 +15,12 @@ import datetime
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="public", html=True))
-#app.mount("/static", StaticFiles(directory="/", html=True))
+app.mount("/static", StaticFiles(directory="/", html=True))
+
+link = "http://192.168.109.235:8000"
 
 origins = [
-    "http://192.168.222.130",
+    link,
     "http://localhost:8000",
     "http://www.emk.like.ru",
     "http://emk.like.ru"
@@ -36,12 +38,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return FileResponse("public/index.html")
-
-@app.get("/index")
-def root():
-    return RedirectResponse("/")
-
+    return RedirectResponse(f"{link}/static/index.html")
 
 
 @app.get("/activites")
@@ -59,7 +56,7 @@ def activites():
         ac = {
             "id" : act[0], 
             "name" : act[1],
-            "coast" : act[2], 
+            "cost" : act[2], 
             "user_uuid" : act[3]
             }
         Activites.append(ac)
@@ -69,7 +66,7 @@ def activites():
 @app.post("/change_activities")
 def change_activities(data = Body()):
 
-    command = f"UPDATE Activites SET name = \'{data['name']}\', coast = {int(data['coast'])}, user_uuid = \'{data['user_uuid']}\' WHERE Id = {int(data['id'])};"
+    command = f"UPDATE Activites SET name = \'{data['name']}\', coast = {int(data['cost'])}, user_uuid = \'{data['user_uuid']}\' WHERE Id = {int(data['id'])};"
     print(command)
 
     cursor = conn.cursor()
@@ -79,7 +76,7 @@ def change_activities(data = Body()):
 @app.post("/new_activities")
 def new_activities(data = Body()):
     
-    command = f"INSERT INTO Activites VALUES ((SELECT MAX(Id) + 1 FROM Activites), \'{data['name']}\', {int(data['coast'])}, \'{data['user_uuid']}\');"
+    command = f"INSERT INTO Activites VALUES ((SELECT MAX(Id) + 1 FROM Activites), \'{data['name']}\', {int(data['cost'])}, \'{data['user_uuid']}\');"
     print(command)
 
     cursor = conn.cursor()
@@ -303,10 +300,10 @@ def statistics_history(action_id, uuid):
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
-            "discr" : act[2],
+            "descr" : act[2],
             "dt_time" : act[3],
             "category" : act[4],
-            "coast" : act[5],
+            "cost" : act[5],
             "id_activites" : act[6]
         }
         Act.append(ac)
@@ -334,10 +331,10 @@ def  new_a_month(uuid):
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
-            "discr" : act[2],
+            "descr" : act[2],
             "dt_time" : act[3],
             "category" : act[4],
-            "coast" : act[5],
+            "cost" : act[5],
             "id_activites" : act[6]
         }
         Act.append(ac)
@@ -366,10 +363,10 @@ def new_active(uuid):
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
-            "discr" : act[2],
+            "descr" : act[2],
             "dt_time" : act[3],
             "category" : act[4],
-            "coast" : act[5],
+            "cost" : act[5],
             "id_activites" : act[6]
         }
         Act.append(ac)
