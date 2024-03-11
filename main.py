@@ -126,7 +126,12 @@ def confirmation(name):
     Activites = []
     for act in activity:
         dt = act[4]
-        ac = {"id" : act[0], "uuid_from" : act[1], "uuid_to" : act[2], "description" : act[3], "date_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}"}
+        ac = {
+                "id" : act[0], "uuid_from" : act[1], 
+                "uuid_to" : act[2], 
+                "description" : act[3], 
+                "date_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}"
+              }
         Activites.append(ac)
 
     return Activites
@@ -297,11 +302,12 @@ def statistics_history(action_id, uuid):
 
     Act = []
     for act in answer:
+        dt = act[3]
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
             "descr" : act[2],
-            "dt_time" : act[3],
+            "dt_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}",
             "category" : act[4],
             "cost" : act[5],
             "id_activites" : act[6]
@@ -328,11 +334,12 @@ def  new_a_month(uuid):
 
     Act=[]
     for act in ans:
+        dt = act[3]
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
             "descr" : act[2],
-            "dt_time" : act[3],
+            "dt_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}",
             "category" : act[4],
             "cost" : act[5],
             "id_activites" : act[6]
@@ -360,11 +367,18 @@ def new_active(uuid):
 
     Act=[]
     for act in ans:
+        dt = act[3]
+        dy = dt.day
+        if len(dy) == 1:
+            dy+='0'
+        mns = dt.month
+        if len(mns) == 1:
+            mns+='0'
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
             "descr" : act[2],
-            "dt_time" : act[3],
+            "dt_time" : f"{dt.hour}:{dt.minute} {dy}.{mns}.{dt.year}",
             "category" : act[4],
             "cost" : act[5],
             "id_activites" : act[6]
@@ -377,9 +391,54 @@ def new_active(uuid):
     
     return {"summ" : sum, "activs" : Act}
 
+@app.get("/all_activities")
+def all_activities():
+    cursor = conn.cursor()
 
+    cursor.execute("SELECT id, name, coast FROM Activites;")
+    activity = cursor.fetchall()
 
+    #cursor.close()
+    #conn.close()
 
+    Activites = []
+    for act in activity:
+        ac = {
+            "id" : act[0], 
+            "name" : act[1],
+            "cost" : act[2]
+            }
+        Activites.append(ac)
+
+    return Activites
+
+@app.get("/get_moders")
+def get_moders():
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT DISTINCT user_uuid, name, id, coast FROM Activites ORDER BY user_uuid;")
+    activity = cursor.fetchall()
+
+    #cursor.close()
+    #conn.close()
+
+    Moders = []
+    for mdr in activity:
+        md = {
+            "moder_id" : mdr[0], 
+            "action_name" : mdr[1],
+            "action_id" : mdr[2],
+            "coast" : mdr[3]
+            }
+        Moders.append(md)
+
+    return Moders
+
+@app.get("/all_admins")
+def all_admins():
+    adms = open("adms.json", 'r')
+    res = json.load(adms)
+    return res
 
 
 
