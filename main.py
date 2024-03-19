@@ -17,7 +17,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="public", html=True))
 app.mount("/static", StaticFiles(directory="/", html=True))
 
-link = "http://192.168.109.235:8000"
+link = "http://192.168.202.235:8000"
 
 origins = [
     link,
@@ -41,6 +41,7 @@ def root():
     return RedirectResponse(f"{link}/static/index.html")
 
 
+
 @app.get("/activites")
 def activites():
     cursor = conn.cursor()
@@ -56,8 +57,7 @@ def activites():
         ac = {
             "id" : act[0], 
             "name" : act[1],
-            "cost" : act[2], 
-            "user_uuid" : act[3]
+            "cost" : act[2]
             }
         Activites.append(ac)
 
@@ -66,7 +66,7 @@ def activites():
 @app.post("/change_activities")
 def change_activities(data = Body()):
 
-    command = f"UPDATE Activites SET name = \'{data['name']}\', coast = {int(data['cost'])}, user_uuid = \'{data['user_uuid']}\' WHERE Id = {int(data['id'])};"
+    command = f"UPDATE Activites SET name = \'{data['name']}\', coast = {int(data['cost'])} WHERE Id = {int(data['id'])};"
     print(command)
 
     cursor = conn.cursor()
@@ -75,8 +75,9 @@ def change_activities(data = Body()):
 
 @app.post("/new_activities")
 def new_activities(data = Body()):
-    
-    command = f"INSERT INTO Activites VALUES ((SELECT MAX(Id) + 1 FROM Activites), \'{data['name']}\', {int(data['cost'])}, \'{data['user_uuid']}\');"
+    name = data['name']
+    cost = int(data['cost'])
+    command = f"INSERT INTO Activites VALUES ((SELECT MAX(Id) + 1 FROM Activites), \'{name}\', {cost});"
     print(command)
 
     cursor = conn.cursor()
@@ -85,16 +86,19 @@ def new_activities(data = Body()):
 
 @app.get("/delete_activities/{active_id}")
 def delete_activities(active_id):
-    command = f"DELETE FROM Activites WHERE Id = {active_id};"
-    print(command)
+    command_1 = f"DELETE FROM ActiveUsers WHERE ActivitesId = {active_id};"
+    command_2 = f"DELETE FROM Activites WHERE Id = {active_id};"
+    print(command_2)
 
     cursor = conn.cursor()
-    cursor.execute(command)
+    cursor.execute(command_1)
+    cursor.execute(command_2)
     conn.commit()
 
 @app.get("/actions/{uuid}")
 def actions(uuid):
-    command = f"SELECT Name, Id FROM Activites WHERE user_uuid = \'{uuid}\';"
+    #command = f"SELECT Name, Id FROM Activites WHERE user_uuid = \'{uuid}\';"
+    command = f"SELECT activites.id, Name FROM Activites JOIN Moder ON ((moder.activeid = activites.id) AND ((moder.user_uuid = \'{uuid}\') OR (moder.user_uuid = '*')));"
     print(command)
 
     cursor = conn.cursor()
@@ -126,11 +130,17 @@ def confirmation(name):
     Activites = []
     for act in activity:
         dt = act[4]
+        dy = str(dt.day)
+        if len(dy) == 1:
+            dy='0'+dy
+        mns = str(dt.month)
+        if len(mns) == 1:
+            mns='0'+mns
         ac = {
                 "id" : act[0], "uuid_from" : act[1], 
                 "uuid_to" : act[2], 
                 "description" : act[3], 
-                "date_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}"
+                "date_time" : f"{dt.hour}:{dt.minute} {dy}.{mns}.{dt.year}"
               }
         Activites.append(ac)
 
@@ -139,7 +149,7 @@ def confirmation(name):
 @app.get("/do_valid/{action_id}/{uuid}")
 def do_valid(action_id, uuid):
     res = False
-    command_1 = f"SELECT activites.user_uuid FROM activites WHERE name = (SELECT activites.name FROM activites JOIN activeusers ON (activeusers.activitesid = activites.id AND activeusers.id = {action_id}) );"
+    command_1 = f"SELECT user_uuid FROM moder WHERE activeid = (SELECT activitesid FROM activeusers WHERE (id = {action_id}));"
     
     command_2 = f"UPDATE ActiveUsers SET valid = 1 WHERE Id = {action_id};"
 
@@ -148,7 +158,7 @@ def do_valid(action_id, uuid):
     cursor.execute(command_1)
     answer = cursor.fetchall()
     for uuids in answer:
-        if uuid == uuids[0]:
+        if ((uuid == uuids[0]) or ((uuids[0] == '*') and (uuid == '1414')) ):
             cursor.execute(command_2)
             conn.commit()
             
@@ -159,8 +169,8 @@ def do_valid(action_id, uuid):
 @app.get("/do_not_valid/{action_id}/{uuid}")
 def do_not_valid(action_id, uuid):
     res = False
-    command_1 = f"SELECT activites.user_uuid FROM activites WHERE name = (SELECT activites.name FROM activites JOIN activeusers ON (activeusers.activitesid = activites.id AND activeusers.id = {action_id}) );"
-    
+    command_1 = f"SELECT user_uuid FROM moder WHERE activeid = (SELECT activitesid FROM activeusers WHERE (id = {action_id}));"
+
     command_2 = f"UPDATE ActiveUsers SET valid = 3 WHERE Id = {action_id};"
 
     cursor = conn.cursor()
@@ -184,33 +194,32 @@ def new_active(data = Body()):
     action_id = data["act_id"]
     description = data["description"]
 
-    command_1 = f"SELECT activites.user_uuid FROM activites WHERE name = (SELECT activites.name FROM activites JOIN activeusers ON (activeusers.activitesid = activites.id AND activeusers.id = {action_id}) );"
-
+    command_1 = f"SELECT moder.user_uuid FROM moder WHERE (activeid = {action_id});"
     command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id});"
 
     cursor = conn.cursor()
 
     cursor.execute(command_1)
     answer = cursor.fetchall()
-    for uuids in answer:
-        if (uuid_from == uuids[0]):
-            cursor.execute(command_2)
-            conn.commit()
+    if answer != "None":
+        for uuids in answer:
+            print(uuids)
+            if ((uuid_from == uuids[0]) or (uuids[0] == '*')):
+                res = True
+                cursor.execute(command_2)
+                conn.commit()
+                break
 
-            res = True
-
-        elif action_id == 1:
-            cursor.execute(command_2)
-            conn.commit()
-
-            res = False
+                
+    else:
+        res = "Нет доступа!"
     
     return res
 
 @app.get("/history_mdr/{action_name}")
 def history_mdr(action_name):
 
-    command  = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.uuid_to, activeusers.description, activeusers.valid, activeusers.date_time, activites.coast, activites.user_uuid FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activites.name = \'{action_name}\');"
+    command  = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.uuid_to, activeusers.description, activeusers.valid, activeusers.date_time, activites.coast FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activites.name = \'{action_name}\');"
     
     print(command)
 
@@ -223,8 +232,16 @@ def history_mdr(action_name):
     for act in activity:
         print(act)
         dt = act[5]
-        st = {0 : "Не подтверждено", 1 : "Не просмотрено", 2 : "Просмотрено", 3 : "Отказано"}
-        ac = {"id" : act[0], "uuid_from" : act[1], "uuid_to" : act[2], "description" : act[3], "stat" : st[act[4]], "date_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}"}
+        dy = str(dt.day)
+        if len(dy) == 1:
+            dy='0'+dy
+        mns = str(dt.month)
+        if len(mns) == 1:
+            mns='0'+mns
+        st = {
+            
+            0 : "Не подтверждено", 1 : "Не просмотрено", 2 : "Просмотрено", 3 : "Отказано"}
+        ac = {"id" : act[0], "uuid_from" : act[1], "uuid_to" : act[2], "description" : act[3], "stat" : st[act[4]], "date_time" : f"{dt.hour}:{dt.minute} {dy}.{mns}.{dt.year}"}
         Activites.append(ac)
 
     return Activites
@@ -235,8 +252,9 @@ def summ(uuid):
 
     cursor.execute(f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1));")
     activity = cursor.fetchone()
-
-    return activity[0]
+    print(activity[0])
+    if activity != "None":
+        return activity[0]
 
 @app.get("/top")
 def top():
@@ -264,6 +282,7 @@ def my_place(uuid):
 
     cursor = conn.cursor()
     cursor.execute(command)
+
     activity = cursor.fetchall()
     res = "Либо Вы вне всяких оценок, либо ВЫ ЕЩЁ СПИТЕ!"
     for act in activity:
@@ -303,11 +322,17 @@ def statistics_history(action_id, uuid):
     Act = []
     for act in answer:
         dt = act[3]
+        dy = str(dt.day)
+        if len(dy) == 1:
+            dy='0'+dy
+        mns = str(dt.month)
+        if len(mns) == 1:
+            mns='0'+mns
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
             "descr" : act[2],
-            "dt_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}",
+            "dt_time" : f"{dt.hour}:{dt.minute} {dy}.{mns}.{dt.year}",
             "category" : act[4],
             "cost" : act[5],
             "id_activites" : act[6]
@@ -335,11 +360,17 @@ def  new_a_month(uuid):
     Act=[]
     for act in ans:
         dt = act[3]
+        dy = str(dt.day)
+        if len(dy) == 1:
+            dy='0'+dy
+        mns = str(dt.month)
+        if len(mns) == 1:
+            mns='0'+mns
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
             "descr" : act[2],
-            "dt_time" : f"{dt.hour}:{dt.minute} {dt.day}.{dt.month}.{dt.year}",
+            "dt_time" : f"{dt.hour}:{dt.minute} {dy}.{mns}.{dt.year}",
             "category" : act[4],
             "cost" : act[5],
             "id_activites" : act[6]
@@ -350,8 +381,8 @@ def  new_a_month(uuid):
 
 @app.get("/new_activs/{uuid}")
 def new_active(uuid):
-    command_1 = f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 1);"
-    command_2 = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 1);"
+    command_1 = f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 2);"
+    command_2 = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 2);"
     command_3 = f"UPDATE  activeusers SET valid = 2 WHERE valid = 1 AND activeusers.uuid_to = \'{uuid}\';"
     cursor = conn.cursor()
 
@@ -367,13 +398,14 @@ def new_active(uuid):
 
     Act=[]
     for act in ans:
+        
         dt = act[3]
-        dy = dt.day
+        dy = str(dt.day)
         if len(dy) == 1:
-            dy+='0'
-        mns = dt.month
+            dy='0'+dy
+        mns = str(dt.month)
         if len(mns) == 1:
-            mns+='0'
+            mns='0'+mns
         ac = {
             "id_activeusers" : act[0],
             "uuid" : act[1],
@@ -391,32 +423,13 @@ def new_active(uuid):
     
     return {"summ" : sum, "activs" : Act}
 
-@app.get("/all_activities")
-def all_activities():
-    cursor = conn.cursor()
 
-    cursor.execute("SELECT id, name, coast FROM Activites;")
-    activity = cursor.fetchall()
-
-    #cursor.close()
-    #conn.close()
-
-    Activites = []
-    for act in activity:
-        ac = {
-            "id" : act[0], 
-            "name" : act[1],
-            "cost" : act[2]
-            }
-        Activites.append(ac)
-
-    return Activites
 
 @app.get("/get_moders")
 def get_moders():
     cursor = conn.cursor()
 
-    cursor.execute("SELECT DISTINCT user_uuid, name, id, coast FROM Activites ORDER BY user_uuid;")
+    cursor.execute("SELECT moder.user_uuid, activites.name, activites.id, activites.coast FROM moder JOIN activites ON activites.id = moder.activeid;")
     activity = cursor.fetchall()
 
     #cursor.close()
@@ -434,13 +447,30 @@ def get_moders():
 
     return Moders
 
+@app.get("/add_moder/{uuid}/{actionid}")
+def add_moder(uuid, actionid):
+    cursor = conn.cursor()
+    cursor.execute(f"INSERT INTO Moder (Id, user_uuid, activeid) VALUES ((SELECT MAX(id)+1 FROM Moder), \'{uuid}\', {actionid});")
+    conn.commit()
+
+@app.get("/add_moder/{uuid}/{actionid}")
+def add_moder(uuid, actionid):
+    cursor = conn.cursor()
+    cursor.execute(f"DELETE FROM Moder WHERE user_uuid = \'{uuid}\' AND activeid = {actionid};")
+    conn.commit()
+
+
+
 @app.get("/all_admins")
 def all_admins():
     adms = open("adms.json", 'r')
     res = json.load(adms)
+
     return res
 
-
+@app.get("/get_uuid")
+def get_uuid():
+    return {"uuid" : "2375"}
 
 #conn.autocommit = True
 #conn.commit()
