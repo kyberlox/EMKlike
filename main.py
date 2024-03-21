@@ -11,13 +11,14 @@ import json
 import datetime
 
 
+#app = FastAPI(docs_url=None, redoc_url=None)
 
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="public", html=True))
 app.mount("/static", StaticFiles(directory="/", html=True))
 
-link = "http://192.168.202.235:8000"
+link = "http://192.168.73.235:8000"
 
 origins = [
     link,
@@ -57,7 +58,8 @@ def activites():
         ac = {
             "id" : act[0], 
             "name" : act[1],
-            "cost" : act[2]
+            "cost" : act[2],
+            "need_valid" : act[3]
             }
         Activites.append(ac)
 
@@ -66,7 +68,7 @@ def activites():
 @app.post("/change_activities")
 def change_activities(data = Body()):
 
-    command = f"UPDATE Activites SET name = \'{data['name']}\', coast = {int(data['cost'])} WHERE Id = {int(data['id'])};"
+    command = f"UPDATE Activites SET name = \'{data['name']}\', coast = {int(data['cost'])}, need_valid = {data['need_valid']} WHERE Id = {int(data['id'])};"
     print(command)
 
     cursor = conn.cursor()
@@ -77,7 +79,8 @@ def change_activities(data = Body()):
 def new_activities(data = Body()):
     name = data['name']
     cost = int(data['cost'])
-    command = f"INSERT INTO Activites VALUES ((SELECT MAX(Id) + 1 FROM Activites), \'{name}\', {cost});"
+    need_valid = data['need_valid']
+    command = f"INSERT INTO Activites VALUES ((SELECT MAX(Id) + 1 FROM Activites), \'{name}\', {cost}, {need_valid});"
     print(command)
 
     cursor = conn.cursor()
@@ -94,6 +97,7 @@ def delete_activities(active_id):
     cursor.execute(command_1)
     cursor.execute(command_2)
     conn.commit()
+    cursor.close() #помогло?
 
 @app.get("/actions/{uuid}")
 def actions(uuid):
@@ -194,11 +198,18 @@ def new_active(data = Body()):
     action_id = data["act_id"]
     description = data["description"]
 
-    command_1 = f"SELECT moder.user_uuid FROM moder WHERE (activeid = {action_id});"
-    command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id});"
-
     cursor = conn.cursor()
+    command_1 = f"SELECT Id FROM activites WHERE need_valid = TRUE;"
+    needs = cursor.fetchall()
+    needs = needs[0]
+    if int(action_id) in needs:
+        command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id});"
+    else:
+        command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId, valid) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id}, 1);"
+    
+    
 
+    command_1 = f"SELECT moder.user_uuid FROM moder WHERE (activeid = {action_id});"
     cursor.execute(command_1)
     answer = cursor.fetchall()
     if answer != "None":
@@ -294,20 +305,27 @@ def my_place(uuid):
 @app.get("/statistics/{uuid}")
 def statistics(uuid):
     command = f"SELECT activites.id, activites.name, SUM(activites.coast) AS SummTable FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1)) GROUP BY activites.name, activites.id;"
-    
     cursor = conn.cursor()
+    
+    cmd = "SELECT * FROM activites"
+    cursor.execute(cmd)
+    activity = cursor.fetchall()
+    ans = dict()
+    for act in activity:
+        ans[act[1]] = [0, act[0]]
+
     cursor.execute(command)
     activity = cursor.fetchall()
-    Act = []
     for act in activity:
-        print(act)
         ac = {
             "id" : act[0],
             "name" : act[1],
             "stat" : act[2]
             }
-        Act.append(ac)
-    return Act
+        print(act[2])
+        ans[act[1]][0] = act[2]
+        
+    return ans
 
 @app.get("/statistics_history/{action_id}/{uuid}")
 def statistics_history(action_id, uuid):
