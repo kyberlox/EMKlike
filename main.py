@@ -18,7 +18,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="public", html=True))
 app.mount("/static", StaticFiles(directory="/", html=True))
 
-link = "http://192.168.73.235:8000"
+link = "http://192.168.19.235:8000"
 
 origins = [
     link,
@@ -102,7 +102,7 @@ def delete_activities(active_id):
 @app.get("/actions/{uuid}")
 def actions(uuid):
     #command = f"SELECT Name, Id FROM Activites WHERE user_uuid = \'{uuid}\';"
-    command = f"SELECT activites.id, Name FROM Activites JOIN Moder ON ((moder.activeid = activites.id) AND ((moder.user_uuid = \'{uuid}\') OR (moder.user_uuid = '*')));"
+    command = f"SELECT activites.id, Name FROM Activites JOIN Moder ON ((moder.activeid = activites.id) AND ((moder.user_uuid = \'{uuid}\') OR (moder.user_uuid  = '*')));"
     print(command)
 
     cursor = conn.cursor()
@@ -112,14 +112,15 @@ def actions(uuid):
 
     Activites = []
     for act in activity:
-        ac = {"id" : act[1], "name" : act[0]}
+        ac = {"id" : act[0], "name" : act[1]}
         Activites.append(ac) 
 
     return Activites
 
-@app.get("/confirmation/{name}/")
-def confirmation(name):
-    command  = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.uuid_to, activeusers.description, activeusers.date_time, activites.coast, activites.user_uuid FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.valid = 0 AND activites.name = \'{name}\');"
+#обновить в табллице
+@app.get("/confirmation/{action_id}/")
+def confirmation(action_id):
+    command  = f"SELECT activeusers.id, activites.name, activeusers.uuid_from, activeusers.uuid_to, activeusers.description, activeusers.date_time, activites.coast, need_valid FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.valid = 0 AND activites.id = \'{action_id}\');"
     
     print(command)
 
@@ -133,7 +134,7 @@ def confirmation(name):
 
     Activites = []
     for act in activity:
-        dt = act[4]
+        dt = act[5]
         dy = str(dt.day)
         if len(dy) == 1:
             dy='0'+dy
@@ -141,15 +142,20 @@ def confirmation(name):
         if len(mns) == 1:
             mns='0'+mns
         ac = {
-                "id" : act[0], "uuid_from" : act[1], 
-                "uuid_to" : act[2], 
-                "description" : act[3], 
-                "date_time" : f"{dt.hour}:{dt.minute} {dy}.{mns}.{dt.year}"
+                "id" : act[0],
+                "name" : act[1], 
+                "uuid_from" : act[2], 
+                "uuid_to" : act[3], 
+                "description" : act[4], 
+                "date_time" : f"{dt.hour}:{dt.minute} {dy}.{mns}.{dt.year}",
+                "cost" : act[6],
+                "need_valid" : act[7]
               }
         Activites.append(ac)
 
     return Activites
 
+#обновить в табллице
 @app.get("/do_valid/{action_id}/{uuid}")
 def do_valid(action_id, uuid):
     res = False
@@ -161,8 +167,11 @@ def do_valid(action_id, uuid):
 
     cursor.execute(command_1)
     answer = cursor.fetchall()
+    
     for uuids in answer:
-        if ((uuid == uuids[0]) or ((uuids[0] == '*') and (uuid == '1414')) ):
+        print(uuids[0], uuid)
+        if ((str(uuid) == uuids[0]) or (uuid == '1414')) :
+            print("###")
             cursor.execute(command_2)
             conn.commit()
             
@@ -170,6 +179,7 @@ def do_valid(action_id, uuid):
 
     return res
 
+#обновить в табллице
 @app.get("/do_not_valid/{action_id}/{uuid}")
 def do_not_valid(action_id, uuid):
     res = False
@@ -190,6 +200,7 @@ def do_not_valid(action_id, uuid):
 
     return res
 
+#обновить в табллице
 @app.post("/new_active")
 def new_active(data = Body()):
     res = False
@@ -197,13 +208,17 @@ def new_active(data = Body()):
     uuid_to =  data["uuid_to"]
     action_id = data["act_id"]
     description = data["description"]
-
     cursor = conn.cursor()
     command_1 = f"SELECT Id FROM activites WHERE need_valid = TRUE;"
-    needs = cursor.fetchall()
-    needs = needs[0]
+    cursor.execute(command_1)
+    need = cursor.fetchall()
+    needs = []
+    for nd in need:
+        needs.append(nd[0])
+
+    print(action_id, needs)
     if int(action_id) in needs:
-        command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id});"
+        command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId, valid) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id}, 0);"
     else:
         command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId, valid) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id}, 1);"
     
@@ -211,16 +226,17 @@ def new_active(data = Body()):
 
     command_1 = f"SELECT moder.user_uuid FROM moder WHERE (activeid = {action_id});"
     cursor.execute(command_1)
-    answer = cursor.fetchall()
+    answer = cursor.fetchone()
+    print(answer)
     if answer != "None":
         for uuids in answer:
             print(uuids)
-            if ((uuid_from == uuids[0]) or (uuids[0] == '*')):
+            if ((uuid_from == uuids) or (uuids == '*')):
+                print(command_2)
                 res = True
                 cursor.execute(command_2)
                 conn.commit()
                 break
-
                 
     else:
         res = "Нет доступа!"
@@ -302,6 +318,7 @@ def my_place(uuid):
 
     return res
 
+#закинь в эксель таблицу
 @app.get("/statistics/{uuid}")
 def statistics(uuid):
     command = f"SELECT activites.id, activites.name, SUM(activites.coast) AS SummTable FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1)) GROUP BY activites.name, activites.id;"
@@ -310,22 +327,26 @@ def statistics(uuid):
     cmd = "SELECT * FROM activites"
     cursor.execute(cmd)
     activity = cursor.fetchall()
-    ans = dict()
-    for act in activity:
-        ans[act[1]] = [0, act[0]]
-
-    cursor.execute(command)
-    activity = cursor.fetchall()
+    res = []
     for act in activity:
         ac = {
             "id" : act[0],
             "name" : act[1],
-            "stat" : act[2]
+            "stat" : None
             }
-        print(act[2])
-        ans[act[1]][0] = act[2]
         
-    return ans
+        res.append(ac)
+
+    cursor.execute(command)
+    activity = cursor.fetchall()
+    for act in activity:
+        for ac in res:
+            
+            if str(ac["id"]) == str(act[0]):
+                print(ac, act)
+                ac["stat"] = act[2]
+        
+    return res
 
 @app.get("/statistics_history/{action_id}/{uuid}")
 def statistics_history(action_id, uuid):
@@ -471,7 +492,7 @@ def add_moder(uuid, actionid):
     cursor.execute(f"INSERT INTO Moder (Id, user_uuid, activeid) VALUES ((SELECT MAX(id)+1 FROM Moder), \'{uuid}\', {actionid});")
     conn.commit()
 
-@app.get("/add_moder/{uuid}/{actionid}")
+@app.get("/del_moder/{uuid}/{actionid}")
 def add_moder(uuid, actionid):
     cursor = conn.cursor()
     cursor.execute(f"DELETE FROM Moder WHERE user_uuid = \'{uuid}\' AND activeid = {actionid};")
