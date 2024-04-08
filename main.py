@@ -518,12 +518,16 @@ def all_admins():
 
     return res
 
-@app.get('/new_adm/{uuid}')
+@app.get('/new_adm/{name}/{uuid}')
 def new_adm(name, uuid):
     adm_db = open("adms.json", 'r')
     adms = json.load(adm_db)
 
-    adms.append(uuid)
+    dct = {
+        "uuid" : uuid
+    }
+
+    adms.append(dct)
 
     adm_db = open("adms.json", 'w')
     json.dump(adms, adm_db)
