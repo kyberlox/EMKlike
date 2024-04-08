@@ -434,6 +434,7 @@ def new_active(uuid):
 
     cursor.execute(command_1)
     answer = cursor.fetchone()
+    print("сумма ")
 
     sum=0
     for ball in answer:
@@ -441,6 +442,7 @@ def new_active(uuid):
     
     cursor.execute(command_2)
     ans = cursor.fetchall()
+    print("показал")
 
     Act=[]
     for act in ans:
@@ -466,6 +468,8 @@ def new_active(uuid):
 
     cursor.execute(command_3)
     conn.commit()
+
+    print("отметил")
     
     return {"summ" : sum, "activs" : Act}
 
@@ -514,17 +518,12 @@ def all_admins():
 
     return res
 
-@app.get('/new_adm/{name}/{uuid}')
+@app.get('/new_adm/{uuid}')
 def new_adm(name, uuid):
     adm_db = open("adms.json", 'r')
     adms = json.load(adm_db)
 
-    dct = {
-        "name" : name,
-        "uuid" : uuid
-    }
-
-    adms.append(dct)
+    adms.append(uuid)
 
     adm_db = open("adms.json", 'w')
     json.dump(adms, adm_db)
@@ -551,7 +550,7 @@ def del_adm(uuid):
 
 @app.get("/get_uuid")
 def get_uuid():
-    return {"uuid" : "2375"}
+    return {"uuid" : "1414"}
 
 
 
