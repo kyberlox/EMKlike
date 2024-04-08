@@ -18,7 +18,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="public", html=True))
 app.mount("/static", StaticFiles(directory="/", html=True))
 
-link = "http://192.168.19.235:8000"
+link = "http://192.168.202.235:8000"
 
 origins = [
     link,
@@ -31,7 +31,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],#, "OPTIONS", "DELETE", "PATH", "PUT"],
+    allow_methods=["GET", "POST", "DELETE", "PUT"],#, "OPTIONS", "PATH"],
     allow_headers=["Content-Type", "Accept", "Location", "Allow", "Content-Disposition", "Sec-Fetch-Dest"],
 )
 
@@ -40,8 +40,6 @@ app.add_middleware(
 @app.get("/")
 def root():
     return RedirectResponse(f"{link}/static/index.html")
-
-
 
 @app.get("/activites")
 def activites():
@@ -87,7 +85,8 @@ def new_activities(data = Body()):
     cursor.execute(command)
     conn.commit()
 
-@app.get("/delete_activities/{active_id}")
+#закинь в эксель таблицу
+@app.delete("/delete_activities/{active_id}")
 def delete_activities(active_id):
     command_1 = f"DELETE FROM ActiveUsers WHERE ActivitesId = {active_id};"
     command_2 = f"DELETE FROM Activites WHERE Id = {active_id};"
@@ -117,7 +116,6 @@ def actions(uuid):
 
     return Activites
 
-#обновить в табллице
 @app.get("/confirmation/{action_id}/")
 def confirmation(action_id):
     command  = f"SELECT activeusers.id, activites.name, activeusers.uuid_from, activeusers.uuid_to, activeusers.description, activeusers.date_time, activites.coast, need_valid FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.valid = 0 AND activites.id = \'{action_id}\');"
@@ -155,7 +153,6 @@ def confirmation(action_id):
 
     return Activites
 
-#обновить в табллице
 @app.get("/do_valid/{action_id}/{uuid}")
 def do_valid(action_id, uuid):
     res = False
@@ -184,15 +181,18 @@ def do_valid(action_id, uuid):
 def do_not_valid(action_id, uuid):
     res = False
     command_1 = f"SELECT user_uuid FROM moder WHERE activeid = (SELECT activitesid FROM activeusers WHERE (id = {action_id}));"
-
+    
     command_2 = f"UPDATE ActiveUsers SET valid = 3 WHERE Id = {action_id};"
 
     cursor = conn.cursor()
 
     cursor.execute(command_1)
     answer = cursor.fetchall()
+    
     for uuids in answer:
-        if (uuid == uuids[0]):
+        print(uuids[0], uuid)
+        if ((str(uuid) == uuids[0]) or (uuid == '1414')) :
+            print("###")
             cursor.execute(command_2)
             conn.commit()
             
@@ -200,7 +200,8 @@ def do_not_valid(action_id, uuid):
 
     return res
 
-#обновить в табллице
+
+
 @app.post("/new_active")
 def new_active(data = Body()):
     res = False
@@ -273,21 +274,28 @@ def history_mdr(action_name):
 
     return Activites
 
+#обновить в табллице
 @app.get("/summ/{uuid}")
 def summ(uuid):
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
 
-    cursor.execute(f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1));")
-    activity = cursor.fetchone()
-    print(activity[0])
-    if activity != "None":
-        return activity[0]
+        cursor.execute(f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1));")
+        activity = cursor.fetchone()
+        print(activity[0])
+        if activity != "None":
+            return activity[0]
+        else:
+            return 0
+    except:
+        return 0
 
+#обновить в табллице
 @app.get("/top")
 def top():
     cursor = conn.cursor()
 
-    cursor.execute("SELECT activeusers.uuid_to AS Tabel, SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND (activeusers.valid = 2 OR activeusers.valid = 1)) GROUP BY activeusers.uuid_to ORDER BY SUM(activites.coast) DESC LIMIT 20;")
+    cursor.execute("SELECT activeusers.uuid_to AS Tabel, SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND (activeusers.valid = 2 OR activeusers.valid = 1)) GROUP BY activeusers.uuid_to ORDER BY SUM(activites.coast) DESC LIMIT 10;")
     activity = cursor.fetchall()
 
     Activites = []
@@ -318,7 +326,6 @@ def my_place(uuid):
 
     return res
 
-#закинь в эксель таблицу
 @app.get("/statistics/{uuid}")
 def statistics(uuid):
     command = f"SELECT activites.id, activites.name, SUM(activites.coast) AS SummTable FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1)) GROUP BY activites.name, activites.id;"
@@ -492,7 +499,7 @@ def add_moder(uuid, actionid):
     cursor.execute(f"INSERT INTO Moder (Id, user_uuid, activeid) VALUES ((SELECT MAX(id)+1 FROM Moder), \'{uuid}\', {actionid});")
     conn.commit()
 
-@app.get("/del_moder/{uuid}/{actionid}")
+@app.delete("/del_moder/{uuid}/{actionid}")
 def add_moder(uuid, actionid):
     cursor = conn.cursor()
     cursor.execute(f"DELETE FROM Moder WHERE user_uuid = \'{uuid}\' AND activeid = {actionid};")
@@ -507,9 +514,46 @@ def all_admins():
 
     return res
 
+@app.get('/new_adm/{name}/{uuid}')
+def new_adm(name, uuid):
+    adm_db = open("adms.json", 'r')
+    adms = json.load(adm_db)
+
+    dct = {
+        "name" : name,
+        "uuid" : uuid
+    }
+
+    adms.append(dct)
+
+    adm_db = open("adms.json", 'w')
+    json.dump(adms, adm_db)
+
+#закинь в эксель таблицу#закинь в эксель таблицу
+@app.delete("/del_adm/{uuid}")
+def del_adm(uuid):
+    adm_db = open("adms.json", 'r')
+    adms = json.load(adm_db)
+
+    dct = []
+
+    for adm in adms:
+        if adm['uuid'] != uuid:
+            print(adm['uuid'], uuid)
+            dct.append(adm)
+    
+    print(adms)
+
+    adm_db = open("adms.json", 'w')
+    json.dump(dct, adm_db)
+
+
+
 @app.get("/get_uuid")
 def get_uuid():
     return {"uuid" : "2375"}
+
+
 
 #conn.autocommit = True
 #conn.commit()
