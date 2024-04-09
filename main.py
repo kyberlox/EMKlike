@@ -18,7 +18,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="public", html=True))
 app.mount("/static", StaticFiles(directory="/", html=True))
 
-link = "http://192.168.202.235:8000"
+link = "http://192.168.1.46:8000"
 
 origins = [
     link,
@@ -201,15 +201,26 @@ def do_not_valid(action_id, uuid):
     return res
 
 
-
+#обновить в табллице
 @app.post("/new_active")
 def new_active(data = Body()):
+    #добавить ограничение по количеству лайков в месяц
+    
     res = False
     uuid_from = data["uuid_from"]
     uuid_to =  data["uuid_to"]
     action_id = data["act_id"]
     description = data["description"]
     cursor = conn.cursor()
+
+    #проверка количества лайков в этом месяце
+    command_0 = f"SELECT DATE_PART('month', date_time) FROM activeusers WHERE (uuid_from = \'{uuid_from}\' AND DATE_PART('month', date_time) = DATE_PART('month', current_date) AND activitesId = 0);"
+    cursor.execute(command_0)
+    likes = cursor.fetchall()
+    print(len(likes))
+    if len(likes) >= 10:
+        return "В этом месяце больше благодарностей оправить нельзя"
+
     command_1 = f"SELECT Id FROM activites WHERE need_valid = TRUE;"
     cursor.execute(command_1)
     need = cursor.fetchall()
@@ -518,8 +529,8 @@ def all_admins():
 
     return res
 
-@app.get('/new_adm/{name}/{uuid}')
-def new_adm(name, uuid):
+@app.get('/new_adm/{uuid}')
+def new_adm(uuid):
     adm_db = open("adms.json", 'r')
     adms = json.load(adm_db)
 
