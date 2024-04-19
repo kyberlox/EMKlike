@@ -15,23 +15,20 @@ import datetime
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="public", html=True))
-app.mount("/static", StaticFiles(directory="/", html=True))
-
-link = "http://192.168.1.46:8000"
+link = "127.0.0.1:8000/"
+web = "https://peer.websto.pro/"
 
 origins = [
-    link,
-    "http://localhost:8000",
-    "http://www.emk.like.ru",
-    "http://emk.like.ru"
+    web,
+    "https://91.218.228.110/",
+    "https://portal.emk.ru/intranet/peer/peer-ajax.php"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "PUT"],#, "OPTIONS", "PATH"],
+    allow_methods=["GET", "POST", "DELETE", "PUT"],
     allow_headers=["Content-Type", "Accept", "Location", "Allow", "Content-Disposition", "Sec-Fetch-Dest"],
 )
 
@@ -39,7 +36,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return RedirectResponse(f"{link}/static/index.html")
+    return RedirectResponse(f"{web}docs")
 
 @app.get("/activites")
 def activites():
@@ -100,18 +97,34 @@ def delete_activities(active_id):
 
 @app.get("/actions/{uuid}")
 def actions(uuid):
+    cursor = conn.cursor()
+    
+    #проверка количества лайков в этом месяце
+    command_0 = f"SELECT DATE_PART('month', date_time) FROM activeusers WHERE (uuid_from = \'{uuid}\' AND DATE_PART('month', date_time) = DATE_PART('month', current_date) AND activitesId = 0);"
+    cursor.execute(command_0)
+    likes = cursor.fetchall()
+    like = 10 - len(likes)
+
+    print(like)
+
+    if len(likes) > 10:
+        like = 0
+    
     #command = f"SELECT Name, Id FROM Activites WHERE user_uuid = \'{uuid}\';"
     command = f"SELECT activites.id, Name FROM Activites JOIN Moder ON ((moder.activeid = activites.id) AND ((moder.user_uuid = \'{uuid}\') OR (moder.user_uuid  = '*')));"
     print(command)
 
-    cursor = conn.cursor()
+    
 
     cursor.execute(command)
     activity = cursor.fetchall()
 
     Activites = []
     for act in activity:
-        ac = {"id" : act[0], "name" : act[1]}
+        if act[0] == 0:
+            ac = {"id" : act[0], "name" : act[1], "thksLeft" : like}
+        else:
+            ac = {"id" : act[0], "name" : act[1]}
         Activites.append(ac) 
 
     return Activites
@@ -214,11 +227,12 @@ def new_active(data = Body()):
     cursor = conn.cursor()
 
     #проверка количества лайков в этом месяце
-    command_0 = f"SELECT DATE_PART('month', date_time) FROM activeusers WHERE (uuid_from = \'{uuid_from}\' AND DATE_PART('month', date_time) = DATE_PART('month', current_date) AND activitesId = 0);"
+    command_0 = f"SELECT DATE_PART('month', date_time) FROM activeusers JOIN activites ON (activeusers.activitesId = activites.id AND activites.need_valid = TRUE AND activeusers.uuid_from = \'{uuid_from}\' AND DATE_PART('month', date_time) = DATE_PART('month', current_date));"
     cursor.execute(command_0)
     likes = cursor.fetchall()
-    print(len(likes))
-    if len(likes) >= 10:
+    likes = 10 - len(likes)
+    print(likes)
+    if likes > 10:
         return "В этом месяце больше благодарностей оправить нельзя"
 
     command_1 = f"SELECT Id FROM activites WHERE need_valid = TRUE;"
@@ -245,7 +259,7 @@ def new_active(data = Body()):
             print(uuids)
             if ((uuid_from == uuids) or (uuids == '*')):
                 print(command_2)
-                res = True
+                res = likes
                 cursor.execute(command_2)
                 conn.commit()
                 break
@@ -436,16 +450,25 @@ def  new_a_month(uuid):
     
     return {"summ" : sum, "activs" : Act}
 
+#внести в таблицу
+@app.get("/check/{uuid}")
+def check(uuid):
+    status = True
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE activeusers SET valid = 2 WHERE (uuid_to = \'{uuid}\' AND valid = 1);")
+    conn.commit()
+
+    return status
+
 @app.get("/new_activs/{uuid}")
 def new_active(uuid):
-    command_1 = f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 2);"
-    command_2 = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 2);"
-    command_3 = f"UPDATE  activeusers SET valid = 2 WHERE valid = 1 AND activeusers.uuid_to = \'{uuid}\';"
+    command_1 = f"SELECT SUM(activites.coast) FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 1);"
+    command_2 = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND activeusers.valid = 1);"
+    #command_3 = f"UPDATE  activeusers SET valid = 2 WHERE valid = 1 AND activeusers.uuid_to = \'{uuid}\';"
     cursor = conn.cursor()
 
     cursor.execute(command_1)
     answer = cursor.fetchone()
-    print("сумма ")
 
     sum=0
     for ball in answer:
@@ -453,7 +476,6 @@ def new_active(uuid):
     
     cursor.execute(command_2)
     ans = cursor.fetchall()
-    print("показал")
 
     Act=[]
     for act in ans:
@@ -475,14 +497,11 @@ def new_active(uuid):
             "id_activites" : act[6]
         }
         Act.append(ac)
+
     
-
-    cursor.execute(command_3)
-    conn.commit()
-
-    print("отметил")
     
     return {"summ" : sum, "activs" : Act}
+
 
 
 
@@ -508,8 +527,10 @@ def get_moders():
 
     return Moders
 
-@app.get("/add_moder/{uuid}/{actionid}")
-def add_moder(uuid, actionid):
+@app.post("/add_moder/")
+def add_moder(data = Body()):
+    uuid = data["uuid"]
+    actionid = data["actionid"]
     cursor = conn.cursor()
     cursor.execute(f"INSERT INTO Moder (Id, user_uuid, activeid) VALUES ((SELECT MAX(id)+1 FROM Moder), \'{uuid}\', {actionid});")
     conn.commit()
@@ -529,8 +550,9 @@ def all_admins():
 
     return res
 
-@app.get('/new_adm/{uuid}')
-def new_adm(uuid):
+@app.post('/new_adm/')
+def new_adm(data = Body()):
+    uuid = data["uuid"]
     adm_db = open("adms.json", 'r')
     adms = json.load(adm_db)
 
@@ -552,7 +574,7 @@ def del_adm(uuid):
     dct = []
 
     for adm in adms:
-        if adm['uuid'] != uuid:
+        if str(adm['uuid']) != uuid:
             print(adm['uuid'], uuid)
             dct.append(adm)
     
@@ -560,6 +582,7 @@ def del_adm(uuid):
 
     adm_db = open("adms.json", 'w')
     json.dump(dct, adm_db)
+    adm_db.close()
 
 
 
