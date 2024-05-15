@@ -218,7 +218,8 @@ def do_not_valid(action_id, uuid):
 @app.post("/new_active")
 def new_active(data = Body()):
     #добавить ограничение по количеству лайков в месяц
-    
+    print(data)
+
     res = False
     uuid_from = data["uuid_from"]
     uuid_to =  data["uuid_to"]
@@ -231,8 +232,9 @@ def new_active(data = Body()):
     cursor.execute(command_0)
     likes = cursor.fetchall()
     likes = 10 - len(likes)
-    print(likes)
-    if likes > 10:
+    print("Лайков осталось: ", likes)
+
+    if likes < 10:
         return "В этом месяце больше благодарностей оправить нельзя"
 
     command_1 = f"SELECT Id FROM activites WHERE need_valid = TRUE;"
@@ -267,6 +269,7 @@ def new_active(data = Body()):
     else:
         res = "Нет доступа!"
     
+    print(res)
     return res
 
 @app.get("/history_mdr/{action_name}")
@@ -334,6 +337,7 @@ def top():
             }
         Activites.append(ac)
 
+    print(Activites)
     return Activites
 
 @app.get("/my_place/{uuid}")
@@ -591,6 +595,52 @@ def get_uuid():
     return {"uuid" : "1414"}
 
 
+
+@app.post("/retro")
+def retro(data = Body()):
+    #собираем запись
+    uuid_from = data["uuid_from"]
+    uuid_to = data["uuid_to"]
+    description =  data["description"]
+    valid = 1
+    dt_tm = data["date"]
+    activitesid = data["activitesid"]
+
+    #проверяем, есть ли такая запись
+    excists = False
+    cursor = conn.cursor()
+    command = f"SELECT id FROM ActiveUsers WHERE ( (activitesid = {activitesid}) AND (description = \'{description}\') AND (uuid_to = \'{uuid_to}\') AND (date_time >= \'{dt_tm}\'::date) AND (date_time < \'{dt_tm}\'::date + \'1 day\'::interval) );"
+    print(command)
+    cursor.execute(command)
+    ans = cursor.fetchall()
+    print(ans)
+
+    if ans != []:
+        excists = True
+    
+    if not excists:
+        #добавить время
+        command = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId, date_time, valid) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {activitesid}, \'{dt_tm}\', 1)";
+        cursor.execute(command)
+        conn.commit()
+
+        command = f"SELECT Id FROM ActiveUsers WHERE ( (uuid_from = \'{uuid_from}\') AND (uuid_to = \'{uuid_to}\') AND (description = \'{description}\') AND (activitesId  = {activitesid}) );"
+        cursor.execute(command)
+        new_id = cursor.fetchone()[0]
+
+        return new_id
+    
+    else:
+        command = f"SELECT Id FROM ActiveUsers WHERE ( (uuid_from = \'{uuid_from}\') AND (uuid_to = \'{uuid_to}\') AND (description = \'{description}\') AND (activitesId  = {activitesid}) );"
+        cursor.execute(command)
+        new_id = cursor.fetchone()[0]
+
+        return new_id
+
+    #если нет -> вносим
+    #cursor = conn.cursor()
+    #cursor.execute(f"INSERT INTO Moder (Id, user_uuid, activeid) VALUES ((SELECT MAX(id)+1 FROM Moder), \'{uuid}\', {actionid});")
+    #conn.commit()
 
 #conn.autocommit = True
 #conn.commit()
