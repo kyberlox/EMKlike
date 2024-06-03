@@ -3,6 +3,9 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 import psycopg2
 conn = psycopg2.connect(dbname="emk", host="127.0.0.1", user="emk_u", password="cdjkjxm", port="5432")
@@ -21,7 +24,8 @@ web = "https://peer.websto.pro/"
 origins = [
     web,
     "https://91.218.228.110/",
-    "https://portal.emk.ru/intranet/peer/peer-ajax.php"
+    "https://portal.emk.ru/intranet/peer/peer-ajax.php",
+    "https://portal.emk.ru"
 ]
 
 app.add_middleware(
@@ -29,7 +33,8 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "PUT"],
-    allow_headers=["Content-Type", "Accept", "Location", "Allow", "Content-Disposition", "Sec-Fetch-Dest"],
+    allow_headers=["*"]
+    #allow_headers=["Content-Type", "Accept", "Location", "Allow", "Content-Disposition", "Sec-Fetch-Dest"],
 )
 
 
@@ -214,11 +219,12 @@ def do_not_valid(action_id, uuid):
     return res
 
 
+
 #обновить в табллице
 @app.post("/new_active")
 def new_active(data = Body()):
     #добавить ограничение по количеству лайков в месяц
-    print(data)
+    #print(data)
 
     res = False
     uuid_from = data["uuid_from"]
@@ -234,8 +240,7 @@ def new_active(data = Body()):
     likes = 10 - len(likes)
     print("Лайков осталось: ", likes)
 
-    if likes < 10:
-        return "В этом месяце больше благодарностей оправить нельзя"
+    
 
     command_1 = f"SELECT Id FROM activites WHERE need_valid = TRUE;"
     cursor.execute(command_1)
@@ -244,9 +249,11 @@ def new_active(data = Body()):
     for nd in need:
         needs.append(nd[0])
 
-    print(action_id, needs)
     if int(action_id) in needs:
-        command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId, valid) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id}, 0);"
+        if likes < 0:
+            return {"result" : False}
+        else:
+            command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId, valid) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id}, 0);"
     else:
         command_2 = f"INSERT INTO ActiveUsers (id, uuid_from, uuid_to, description, activitesId, valid) VALUES ((SELECT MAX(Id)+1 FROM ActiveUsers), \'{uuid_from}\', \'{uuid_to}\', \'{description}\', {action_id}, 1);"
     
@@ -254,23 +261,24 @@ def new_active(data = Body()):
 
     command_1 = f"SELECT moder.user_uuid FROM moder WHERE (activeid = {action_id});"
     cursor.execute(command_1)
-    answer = cursor.fetchone()
+    answer = cursor.fetchall()
     print(answer)
+    
     if answer != "None":
         for uuids in answer:
-            print(uuids)
-            if ((uuid_from == uuids) or (uuids == '*')):
+            uuid=uuids[0]
+            if ((uuid_from == uuid) or (uuid == '*')):
                 print(command_2)
-                res = likes
+                
                 cursor.execute(command_2)
                 conn.commit()
+                return {"result" : True}
                 break
                 
     else:
-        res = "Нет доступа!"
-    
-    print(res)
-    return res
+        return {"result" : False}
+
+
 
 @app.get("/history_mdr/{action_name}")
 def history_mdr(action_name):
@@ -387,7 +395,7 @@ def statistics(uuid):
 @app.get("/statistics_history/{action_id}/{uuid}")
 def statistics_history(action_id, uuid):
 
-    command = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time, activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1) AND activites.id = {action_id});"
+    command = f"SELECT activeusers.id, activeusers.uuid_from, activeusers.description, activeusers.date_time + interval '4 hour', activites.name, activites.coast, activites.id FROM activeusers JOIN activites ON (activeusers.activitesid = activites.id AND activeusers.uuid_to = \'{uuid}\' AND (activeusers.valid = 2 OR activeusers.valid = 1) AND activites.id = {action_id});"
     
     cursor = conn.cursor()
 
@@ -509,8 +517,8 @@ def new_active(uuid):
 
 
 
-@app.get("/get_moders")
-def get_moders():
+@app.get("/all_curators")
+def get_tutors():
     cursor = conn.cursor()
 
     cursor.execute("SELECT moder.user_uuid, activites.name, activites.id, activites.coast FROM moder JOIN activites ON activites.id = moder.activeid;")
@@ -521,6 +529,7 @@ def get_moders():
 
     Moders = []
     for mdr in activity:
+        print(mdr)
         md = {
             "moder_id" : mdr[0], 
             "action_name" : mdr[1],
@@ -531,19 +540,76 @@ def get_moders():
 
     return Moders
 
-@app.post("/add_moder/")
-def add_moder(data = Body()):
+@app.post("/add_curator/")
+def add_tutor(data = Body()):
     uuid = data["uuid"]
     actionid = data["actionid"]
     cursor = conn.cursor()
     cursor.execute(f"INSERT INTO Moder (Id, user_uuid, activeid) VALUES ((SELECT MAX(id)+1 FROM Moder), \'{uuid}\', {actionid});")
     conn.commit()
 
-@app.delete("/del_moder/{uuid}/{actionid}")
-def add_moder(uuid, actionid):
+@app.delete("/del_curator/{uuid}/{actionid}")
+def del_tutor(uuid, actionid):
     cursor = conn.cursor()
     cursor.execute(f"DELETE FROM Moder WHERE user_uuid = \'{uuid}\' AND activeid = {actionid};")
     conn.commit()
+
+
+
+@app.get("/all_moders")
+def all_moders():
+    adms = open("mdrs.json", 'r')
+    res = json.load(adms)
+
+    return res
+
+@app.post('/new_moder/')
+def new_moder(data = Body()):
+    uuid = str(data["uuid"])
+    action = str(data["action"])
+
+    command = f"SELECT name FROM activites WHERE id = {action};"
+    cursor = conn.cursor()
+    cursor.execute(command)
+    action_name = cursor.fetchone()[0]
+
+    print(action_name)
+    
+    adm_db = open("mdrs.json", 'r')
+    adms = json.load(adm_db)
+
+    
+
+    if uuid in adms.keys():
+        if action in adms[uuid].keys():
+            return "У этого модератора уже есть такая активность"
+        else:
+            #заприсать модеру ещё одну активность
+            adms[uuid][action] = action_name
+    else:
+        #записать модера
+        adms[uuid] = {action : action_name}
+
+    adm_db = open("mdrs.json", 'w')
+    json.dump(adms, adm_db)
+
+#закинь в эксель таблицу#закинь в эксель таблицу
+@app.delete("/del_moder/{uuid}/{action}")
+def del_moder(uuid, action):
+    adm_db = open("adms.json", 'r')
+    adms = json.loads(adm_db)
+
+    if uuid in adms.keys():
+        adms[uuid].pop(action)
+        if adms[uuid] == {}:
+            adms.pop(uuid)  
+    else:
+        return "Такого модератора нет"
+
+
+    adm_db = open("mdrs.json", 'w')
+    json.dumps(adms, adm_db)
+    adm_db.close()
 
 
 
@@ -569,7 +635,6 @@ def new_adm(data = Body()):
     adm_db = open("adms.json", 'w')
     json.dump(adms, adm_db)
 
-#закинь в эксель таблицу#закинь в эксель таблицу
 @app.delete("/del_adm/{uuid}")
 def del_adm(uuid):
     adm_db = open("adms.json", 'r')
@@ -578,8 +643,8 @@ def del_adm(uuid):
     dct = []
 
     for adm in adms:
-        if str(adm['uuid']) != uuid:
-            print(adm['uuid'], uuid)
+        if (str(adm['uuid']) != uuid):
+            print(uuid)
             dct.append(adm)
     
     print(adms)
@@ -590,14 +655,17 @@ def del_adm(uuid):
 
 
 
+'''
 @app.get("/get_uuid")
 def get_uuid():
     return {"uuid" : "1414"}
+'''
 
 
 
 @app.post("/retro")
 def retro(data = Body()):
+    print(data)
     #собираем запись
     uuid_from = data["uuid_from"]
     uuid_to = data["uuid_to"]
