@@ -521,7 +521,7 @@ def new_active(uuid):
 def get_tutors():
     cursor = conn.cursor()
 
-    cursor.execute("SELECT moder.user_uuid, activites.name, activites.id, activites.coast FROM moder JOIN activites ON activites.id = moder.activeid;")
+    cursor.execute("SELECT moder.user_uuid, activites.name, activites.id FROM moder JOIN activites ON activites.id = moder.activeid;")
     activity = cursor.fetchall()
 
     #cursor.close()
@@ -534,11 +534,18 @@ def get_tutors():
             "moder_id" : mdr[0], 
             "action_name" : mdr[1],
             "action_id" : mdr[2],
-            "coast" : mdr[3]
             }
         Moders.append(md)
 
-    return Moders
+    result = dict()
+    for md in Moders:
+        if md["moder_id"] not in result.keys():
+            result[ md["moder_id"] ] = {md["action_id"] : md["action_name"]}
+        elif md["moder_id"] in result.keys():
+            result[ md["moder_id"] ] [md["action_id"] ] = md["action_name"]
+
+
+    return result
 
 @app.post("/add_curator/")
 def add_tutor(data = Body()):
@@ -553,6 +560,19 @@ def del_tutor(uuid, actionid):
     cursor = conn.cursor()
     cursor.execute(f"DELETE FROM Moder WHERE user_uuid = \'{uuid}\' AND activeid = {actionid};")
     conn.commit()
+
+@app.get("/is_curator/{uuid}")
+def is_curator(uuid):
+    cmd = "SELECT DISTINCT(user_uuid) FROM Moder;"
+    cursor = conn.cursor()
+    cursor.execute(cmd)
+    uuids = cursor.fetchall()
+
+    for tutor in uuids:
+        tutor_uuid = tutor[0]
+        if tutor_uuid == uuid:
+            return {"response" : True}
+    return {"response" : False}
 
 
 
@@ -611,6 +631,15 @@ def del_moder(uuid, action):
     json.dumps(adms, adm_db)
     adm_db.close()
 
+@app.get("/is_moder/{uuid}")
+def is_moder(uuid):
+    mdr_db = open("mdrs.json", 'r')
+    mdrs = json.load(mdr_db)
+
+    if uuid in mdrs.keys():
+        return {"response" : True}
+    return {"response" : False}
+
 
 
 @app.get("/all_admins")
@@ -653,13 +682,16 @@ def del_adm(uuid):
     json.dump(dct, adm_db)
     adm_db.close()
 
+@app.get("/is_admin/{uuid}")
+def is_admin(uuid):
+    adm_db = open("adms.json", 'r')
+    adms = json.load(adm_db)
 
+    for admin in adms:
+        if int(uuid) == int(admin["uuid"]):
+            return {"response" : True}
+    return {"response" : False}
 
-'''
-@app.get("/get_uuid")
-def get_uuid():
-    return {"uuid" : "1414"}
-'''
 
 
 
@@ -709,6 +741,3 @@ def retro(data = Body()):
     #cursor = conn.cursor()
     #cursor.execute(f"INSERT INTO Moder (Id, user_uuid, activeid) VALUES ((SELECT MAX(id)+1 FROM Moder), \'{uuid}\', {actionid});")
     #conn.commit()
-
-#conn.autocommit = True
-#conn.commit()
